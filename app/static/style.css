@@ -1,0 +1,109 @@
+:root {
+    --bg: #0f1115;
+    --surface: #171a21;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #8b92a3;
+    --accent: #4da3ff;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+}
+
+header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 1.5rem;
+}
+
+nav.tabs,
+nav.range-presets {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+nav.tabs {
+    padding-top: 0.75rem;
+}
+
+nav.range-presets {
+    padding: 0.5rem 0 0.75rem;
+}
+
+.tab,
+.preset {
+    color: var(--muted);
+    text-decoration: none;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.tab {
+    border-radius: 6px 6px 0 0;
+}
+
+.tab.active,
+.tab:hover {
+    color: var(--text);
+    background: var(--surface);
+}
+
+.preset {
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: 0.8rem;
+}
+
+.preset.active {
+    color: var(--bg);
+    background: var(--accent);
+}
+
+main {
+    padding: 1.5rem;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.kpi-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+}
+
+.kpi-name {
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.kpi-value {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.kpi-units {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--muted);
+    margin-left: 0.35rem;
+}
+
+.empty {
+    color: var(--muted);
+}

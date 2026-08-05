@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="kpi-grid">
+    {% for metric in metrics %}
+    <div class="kpi-tile">
+        <div class="kpi-name">{{ metric.name }}</div>
+        <div class="kpi-value">
+            {{ "%.1f" | format(metric.value) if metric.value is not none else "—" }}
+            <span class="kpi-units">{{ metric.units }}</span>
+        </div>
+    </div>
+    {% else %}
+    <p class="empty">No level-1 metrics in metric_registry yet.</p>
+    {% endfor %}
+</div>
+{% endblock %}

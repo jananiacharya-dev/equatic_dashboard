@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Equatic Plant Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <nav class="tabs">
+            {% for page in pages %}
+            <a class="tab{% if page == current_page %} active{% endif %}" href="/{{ page }}">{{ page | replace("_", " ") | title }}</a>
+            {% endfor %}
+        </nav>
+        <nav class="range-presets">
+            {% for preset in range_presets %}
+            <a class="preset{% if preset == current_range %} active{% endif %}" href="{{ request.path }}?range={{ preset }}">{{ preset }}</a>
+            {% endfor %}
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
