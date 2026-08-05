@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16.4
+    container_name: equatic_db
+    environment:
+      POSTGRES_USER: equatic
+      POSTGRES_PASSWORD: equatic_dev   # dev-only credential, never reuse for anything real
+      POSTGRES_DB: plant_dashboard
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equatic -d plant_dashboard"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
