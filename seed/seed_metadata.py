@@ -166,11 +166,30 @@ def main():
         (:tag_id, :source_tag_id, :instrument_type, :measurement, :units,
          :range_min, :range_max, :subsystem, :stack_group, :stack_id,
          :cell_number, :signal_class, :data_source, :display_page, :display_group)
-        ON CONFLICT (tag_id) DO NOTHING""")
+        ON CONFLICT (tag_id) DO UPDATE SET
+            source_tag_id   = COALESCE(sensor_inventory.source_tag_id, EXCLUDED.source_tag_id),
+            instrument_type = EXCLUDED.instrument_type,
+            measurement     = EXCLUDED.measurement,
+            units           = EXCLUDED.units,
+            range_min       = EXCLUDED.range_min,
+            range_max       = EXCLUDED.range_max,
+            subsystem       = EXCLUDED.subsystem,
+            stack_group     = EXCLUDED.stack_group,
+            stack_id        = EXCLUDED.stack_id,
+            cell_number     = EXCLUDED.cell_number,
+            signal_class    = EXCLUDED.signal_class,
+            data_source     = EXCLUDED.data_source,
+            display_page    = EXCLUDED.display_page,
+            display_group   = EXCLUDED.display_group""")
     ins_met = text("""
         INSERT INTO metric_registry VALUES
         (:metric_id, :name, :formula_ref, :units, :display_page, :level)
-        ON CONFLICT (metric_id) DO NOTHING""")
+        ON CONFLICT (metric_id) DO UPDATE SET
+            name         = EXCLUDED.name,
+            formula_ref  = EXCLUDED.formula_ref,
+            units        = EXCLUDED.units,
+            display_page = EXCLUDED.display_page,
+            level        = EXCLUDED.level""")
 
     with engine.begin() as conn:
         conn.execute(ins_inv, rows)

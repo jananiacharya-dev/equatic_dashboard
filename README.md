@@ -22,11 +22,18 @@ without touching the database.
 docker compose down -v && docker compose up -d   # wipes data, re-applies schema
 ```
 
-## How to add a sensor
+## How to add or edit a sensor / metric
 
-Insert a row into `sensor_inventory` (or extend the loops in
-`seed/seed_metadata.py` and rerun — it upserts). No application code changes.
+Extend the loops in `seed/seed_metadata.py` (or edit `METRICS` for a metric)
+and rerun `python seed/seed_metadata.py` — both inserts are true upserts
+(`ON CONFLICT ... DO UPDATE`), so editing an existing tag's or metric's fields
+and rerunning updates that row in place. No application code changes.
 The UI reads `display_page` / `display_group` to decide where everything renders.
+
+Exception: `source_tag_id` on `sensor_inventory` is never overwritten by
+reseeding once it's non-null in the DB — the script always passes `None` for
+it, and the upsert preserves whatever value is already there. That column is
+meant to hold vendor tag mappings that won't live in this script.
 
 ## Layout
 
