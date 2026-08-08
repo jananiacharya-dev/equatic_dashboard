@@ -22,7 +22,7 @@ def parse_range(range_str):
     if not match:
         raise ValueError(f"unrecognized range: {range_str!r}")
     qty, unit = match.groups()
-    end = datetime.now(timezone.utc)
+    end = datetime(2026, 8, 6, tzinfo=timezone.utc)  # TODO: frozen "now" for demo; revert to datetime.now(timezone.utc)
     start = end - int(qty) * _RANGE_UNITS[unit]
     return start, end
 

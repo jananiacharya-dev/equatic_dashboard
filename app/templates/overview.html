@@ -14,4 +14,76 @@
     <p class="empty">No level-1 metrics in metric_registry yet.</p>
     {% endfor %}
 </div>
+
+<div class="chart-row">
+    <div id="ce-chart" class="chart"></div>
+    <div class="annotation-feed">
+        <h3>Annotations</h3>
+        {% if annotations %}
+        <ul>
+            {% for a in annotations %}
+            <li>
+                <div class="ann-time">{{ a.ts_display }}</div>
+                <div class="ann-type">{{ a.event_type }}</div>
+                <div class="ann-desc">{{ a.description or "—" }}</div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty">No annotations in this range.</p>
+        {% endif %}
+    </div>
+</div>
+<script>
+    var annotations = {{ annotations | tojson }};
+
+    var annotationShapes = annotations.map(function (a) {
+        return {
+            type: "line",
+            xref: "x",
+            yref: "paper",
+            x0: a.ts_iso,
+            x1: a.ts_iso,
+            y0: 0,
+            y1: 1,
+            line: {color: "#ff6b6b", width: 1, dash: "dot"}
+        };
+    });
+
+    // Shapes alone can't carry hover text, so an invisible marker on a fixed
+    // [0,1] overlay axis (yaxis2) rides along each line to hold the tooltip,
+    // independent of wherever the CE trace's own y-scale happens to be.
+    var annotationHover = {
+        x: annotations.map(function (a) { return a.ts_iso; }),
+        y: annotations.map(function () { return 0.9; }),
+        xaxis: "x",
+        yaxis: "y2",
+        mode: "markers",
+        marker: {size: 10, opacity: 0},
+        hoverinfo: "text",
+        hovertext: annotations.map(function (a) {
+            return a.event_type + ": " + (a.description || "");
+        }),
+        showlegend: false
+    };
+
+    Plotly.newPlot("ce-chart", [
+        {
+            x: {{ ce_x | tojson }},
+            y: {{ ce_y | tojson }},
+            type: "scatter",
+            mode: "lines+markers",
+            name: {{ ce_name | tojson }}
+        },
+        annotationHover
+    ], {
+        title: {{ (ce_name ~ " (" ~ ce_units ~ ")") | tojson }},
+        xaxis: {title: "Time", type: "date", range: {{ ce_range | tojson }}},
+        yaxis: {title: {{ ce_units | tojson }}},
+        yaxis2: {overlaying: "y", range: [0, 1], visible: false},
+        shapes: annotationShapes,
+        showlegend: false,
+        margin: {t: 48}
+    });
+</script>
 {% endblock %}

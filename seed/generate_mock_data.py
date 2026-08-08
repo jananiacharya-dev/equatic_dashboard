@@ -145,14 +145,18 @@ def main():
             "('Admin User', 'admin@example.com', 'admin', 'dev-only-not-a-hash'), "
             "('Operator User', 'operator@example.com', 'operator', 'dev-only-not-a-hash') "
             "ON CONFLICT (email) DO NOTHING"))
-        conn.execute(text(
-            "INSERT INTO annotations (ts_utc, event_type, description, created_by) VALUES "
-            "(:t1, 'flush', 'Acid flush SG-2', 1), "
-            "(:t2, 'outage', 'Grid power dip, 4 min', 1), "
-            "(:t3, 'config_change', 'Catholyte flow setpoint +5%', 1)"),
-            dict(t1=start + timedelta(hours=6),
-                 t2=start + timedelta(hours=20),
-                 t3=start + timedelta(hours=30)))
+        # annotations has no natural unique key to ON CONFLICT on, so guard
+        # in Python: only seed the demo rows once, otherwise reruns pile up
+        # duplicates anchored to whatever "now" happened to be each time.
+        if conn.execute(text("SELECT COUNT(*) FROM annotations")).scalar_one() == 0:
+            conn.execute(text(
+                "INSERT INTO annotations (ts_utc, event_type, description, created_by) VALUES "
+                "(:t1, 'flush', 'Acid flush SG-2', 1), "
+                "(:t2, 'outage', 'Grid power dip, 4 min', 1), "
+                "(:t3, 'config_change', 'Catholyte flow setpoint +5%', 1)"),
+                dict(t1=start + timedelta(hours=6),
+                     t2=start + timedelta(hours=20),
+                     t3=start + timedelta(hours=30)))
     print("Users and annotations seeded. Done.")
 
 
