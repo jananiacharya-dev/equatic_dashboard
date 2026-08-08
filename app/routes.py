@@ -1,7 +1,13 @@
 from flask import redirect, render_template, request, url_for
 
 from app import app
-from app.data_access import get_annotations, get_latest_metrics, get_metric_series, parse_range
+from app.data_access import (
+    get_annotations,
+    get_latest_metrics,
+    get_metric_series,
+    parse_range,
+    resolution_for_range,
+)
 
 PAGES = ["overview", "voltage", "process", "effluent", "carbonation"]
 RANGE_PRESETS = ["1h", "24h", "48h", "1w", "1m", "3m", "6m"]
@@ -23,7 +29,7 @@ def overview():
     ce_name = ce_meta["name"] if ce_meta else "ce"
     ce_units = ce_meta["units"] if ce_meta else ""
 
-    ce_series = get_metric_series("ce", start, end)
+    ce_series = get_metric_series("ce", start, end, resolution=resolution_for_range(range_str))
     ce_x = [ts.isoformat() for ts in ce_series["ts_utc"]]
     ce_y = ce_series["value"].tolist()
 

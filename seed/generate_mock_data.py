@@ -117,7 +117,7 @@ def main():
                 "ON CONFLICT DO NOTHING"), events)
     print(f"{len(events)} state_events written")
 
-    # --- daily metric_values ---
+    # --- daily metric_values (gcdr_day, uptime) ---
     mv = []
     days = max(args.hours // 24, 1)
     for d in range(days):
@@ -128,10 +128,31 @@ def main():
             dict(metric_id="uptime", ts_utc=ts,
                  value=round(float(np.clip(rng.normal(88, 6), 60, 100)), 1),
                  resolution="daily"),
-            dict(metric_id="ce", ts_utc=ts,
-                 value=round(float(np.clip(rng.normal(72, 4), 50, 90)), 1),
-                 resolution="daily"),
         ]
+
+    # --- ce at raw (1-min) resolution, mean-reverting drift + rare excursions,
+    # rolled up into hourly/daily so short and long range pickers both have data ---
+    raw_ce = []
+    level = 72.0
+    for s in range(n_steps):
+        ts = start + timedelta(minutes=s * STEP_MIN)
+        level = float(np.clip(level + rng.normal(0, 0.15), 65, 78))
+        v = level + rng.normal(0, 1.2)
+        if rng.random() < 0.01:
+            v += rng.choice([-1, 1]) * rng.uniform(8, 16)
+        raw_ce.append((ts, round(float(np.clip(v, 40, 95)), 2)))
+
+    mv += [dict(metric_id="ce", ts_utc=ts, value=v, resolution="raw") for ts, v in raw_ce]
+
+    hourly_ce, daily_ce = {}, {}
+    for ts, v in raw_ce:
+        hourly_ce.setdefault(ts.replace(minute=0), []).append(v)
+        daily_ce.setdefault(ts.replace(hour=0, minute=0), []).append(v)
+    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="hourly")
+           for ts, vs in hourly_ce.items()]
+    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="daily")
+           for ts, vs in daily_ce.items()]
+
     with engine.begin() as conn:
         conn.execute(text(
             "INSERT INTO metric_values VALUES "

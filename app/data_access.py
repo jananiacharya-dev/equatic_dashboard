@@ -22,9 +22,25 @@ def parse_range(range_str):
     if not match:
         raise ValueError(f"unrecognized range: {range_str!r}")
     qty, unit = match.groups()
-    end = datetime(2026, 8, 6, tzinfo=timezone.utc)  # TODO: frozen "now" for demo; revert to datetime.now(timezone.utc)
+    end = datetime.now(timezone.utc)
     start = end - int(qty) * _RANGE_UNITS[unit]
     return start, end
+
+
+def resolution_for_range(range_str):
+    """Coarser metric_values resolution as the requested span grows, so a query
+    over a long range doesn't pull raw-resolution row counts, and a short range
+    doesn't land between sparse daily/hourly points and come back empty."""
+    match = _RANGE_RE.fullmatch(range_str)
+    if not match:
+        raise ValueError(f"unrecognized range: {range_str!r}")
+    qty, unit = match.groups()
+    span = int(qty) * _RANGE_UNITS[unit]
+    if span <= timedelta(hours=48):
+        return "raw"
+    if span <= timedelta(days=30):
+        return "hourly"
+    return "daily"
 
 
 def _to_df(result):
