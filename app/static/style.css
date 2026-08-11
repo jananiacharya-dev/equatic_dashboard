@@ -67,6 +67,38 @@ nav.range-presets {
     background: var(--accent);
 }
 
+.range-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+    padding-left: 0.75rem;
+    border-left: 1px solid var(--border);
+}
+
+.range-arrow {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+}
+
+.range-arrow:hover {
+    background: var(--surface);
+}
+
+.range-arrow.disabled {
+    color: var(--border);
+    pointer-events: none;
+}
+
+.range-window {
+    color: var(--muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
 main {
     padding: 1.5rem;
 }

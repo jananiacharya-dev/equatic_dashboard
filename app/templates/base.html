@@ -18,6 +18,15 @@
             {% for preset in range_presets %}
             <a class="preset{% if preset == current_range %} active{% endif %}" href="{{ request.path }}?range={{ preset }}">{{ preset }}</a>
             {% endfor %}
+            <span class="range-nav">
+                <a class="range-arrow" href="{{ request.path }}?range={{ current_range }}&offset={{ current_offset + 1 }}" title="Previous {{ current_range }}">&larr;</a>
+                <span class="range-window">{{ window_display }}</span>
+                {% if current_offset > 0 %}
+                <a class="range-arrow" href="{{ request.path }}?range={{ current_range }}&offset={{ current_offset - 1 }}" title="Next {{ current_range }}">&rarr;</a>
+                {% else %}
+                <span class="range-arrow disabled">&rarr;</span>
+                {% endif %}
+            </span>
         </nav>
     </header>
 

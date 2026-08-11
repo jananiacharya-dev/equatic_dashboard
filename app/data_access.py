@@ -17,13 +17,20 @@ _RANGE_UNITS = {
 _RANGE_RE = re.compile(r"(\d+)([hdwm])")
 
 
-def parse_range(range_str):
+def _range_span(range_str):
     match = _RANGE_RE.fullmatch(range_str)
     if not match:
         raise ValueError(f"unrecognized range: {range_str!r}")
     qty, unit = match.groups()
-    end = datetime.now(timezone.utc)
-    start = end - int(qty) * _RANGE_UNITS[unit]
+    return int(qty) * _RANGE_UNITS[unit]
+
+
+def parse_range(range_str, offset=0):
+    """offset shifts the window back by whole range-widths, so 'previous'/'next'
+    arrows can page through history without changing the selected span."""
+    span = _range_span(range_str)
+    end = datetime.now(timezone.utc) - offset * span
+    start = end - span
     return start, end
 
 
@@ -31,11 +38,7 @@ def resolution_for_range(range_str):
     """Coarser metric_values resolution as the requested span grows, so a query
     over a long range doesn't pull raw-resolution row counts, and a short range
     doesn't land between sparse daily/hourly points and come back empty."""
-    match = _RANGE_RE.fullmatch(range_str)
-    if not match:
-        raise ValueError(f"unrecognized range: {range_str!r}")
-    qty, unit = match.groups()
-    span = int(qty) * _RANGE_UNITS[unit]
+    span = _range_span(range_str)
     if span <= timedelta(hours=48):
         return "raw"
     if span <= timedelta(days=30):

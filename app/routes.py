@@ -22,7 +22,8 @@ def index():
 @app.route("/overview")
 def overview():
     range_str = request.args.get("range", DEFAULT_RANGE)
-    start, end = parse_range(range_str)
+    offset = max(0, request.args.get("offset", 0, type=int))
+    start, end = parse_range(range_str, offset=offset)
 
     metrics = get_latest_metrics().to_dict("records")
     ce_meta = next((m for m in metrics if m["metric_id"] == "ce"), None)
@@ -50,6 +51,8 @@ def overview():
         range_presets=RANGE_PRESETS,
         current_page="overview",
         current_range=range_str,
+        current_offset=offset,
+        window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
         metrics=metrics,
         ce_name=ce_name,
         ce_units=ce_units,
