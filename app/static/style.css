@@ -206,3 +206,42 @@ main {
     color: var(--text);
     margin-top: 0.15rem;
 }
+
+.hidden {
+    display: none;
+}
+
+.annotation-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.annotation-form input,
+.annotation-form select {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.annotation-form button {
+    font: inherit;
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.annotation-form button[type="submit"] {
+    background: var(--accent);
+    color: var(--surface);
+    border-color: var(--accent);
+}

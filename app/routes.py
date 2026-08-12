@@ -1,13 +1,18 @@
+from datetime import datetime, timezone
+
 from flask import redirect, render_template, request, url_for
 
 from app import app
 from app.data_access import (
+    add_annotation,
     get_annotations,
     get_latest_metrics,
     get_metric_series,
     parse_range,
     resolution_for_range,
 )
+
+ANNOTATION_EVENT_TYPES = ["flush", "outage", "config_change", "note"]
 
 PAGES = ["overview", "voltage", "process", "effluent", "carbonation"]
 RANGE_PRESETS = ["1h", "24h", "48h", "1w", "1m", "3m", "6m"]
@@ -60,4 +65,25 @@ def overview():
         ce_y=ce_y,
         ce_range=[start.isoformat(), end.isoformat()],
         annotations=annotations,
+        event_types=ANNOTATION_EVENT_TYPES,
     )
+
+
+@app.route("/overview/annotations", methods=["POST"])
+def add_annotation_route():
+    range_str = request.form.get("range", DEFAULT_RANGE)
+    offset = request.form.get("offset", 0, type=int)
+
+    ts_iso = request.form.get("ts_iso", "")
+    event_type = request.form.get("event_type", "")
+    description = request.form.get("description", "").strip() or None
+
+    if event_type in ANNOTATION_EVENT_TYPES:
+        try:
+            ts_utc = datetime.fromisoformat(ts_iso).astimezone(timezone.utc)
+        except ValueError:
+            ts_utc = None
+        if ts_utc is not None:
+            add_annotation(ts_utc, event_type, description)
+
+    return redirect(url_for("overview", range=range_str, offset=offset))

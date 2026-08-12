@@ -19,6 +19,19 @@
     <div id="ce-chart" class="chart"></div>
     <div class="annotation-feed">
         <h3>Annotations</h3>
+        <form id="annotation-form" method="post" action="{{ url_for('add_annotation_route') }}" class="annotation-form hidden">
+            <input type="hidden" name="range" value="{{ current_range }}">
+            <input type="hidden" name="offset" value="{{ current_offset }}">
+            <input type="text" name="ts_iso" id="annotation-ts-iso" readonly>
+            <select name="event_type" required>
+                {% for et in event_types %}
+                <option value="{{ et }}">{{ et }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="description" placeholder="Description" maxlength="255">
+            <button type="submit">Add annotation</button>
+            <button type="button" id="annotation-cancel">Cancel</button>
+        </form>
         {% if annotations %}
         <ul>
             {% for a in annotations %}
@@ -84,6 +97,17 @@
         shapes: annotationShapes,
         showlegend: false,
         margin: {t: 48}
+    }).then(function (gd) {
+        gd.on("plotly_click", function (evt) {
+            var point = evt.points[0];
+            if (!point) return;
+            document.getElementById("annotation-ts-iso").value = new Date(point.x).toISOString().replace("Z", "+00:00");
+            document.getElementById("annotation-form").classList.remove("hidden");
+        });
+    });
+
+    document.getElementById("annotation-cancel").addEventListener("click", function () {
+        document.getElementById("annotation-form").classList.add("hidden");
     });
 </script>
 {% endblock %}

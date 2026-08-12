@@ -119,3 +119,17 @@ def get_annotations(start, end):
     """)
     with engine.connect() as conn:
         return _to_df(conn.execute(sql, {"start": start, "end": end}))
+
+
+def add_annotation(ts_utc, event_type, description, test_run_id=None):
+    sql = text("""
+        INSERT INTO annotations (ts_utc, event_type, description, test_run_id)
+        VALUES (:ts_utc, :event_type, :description, :test_run_id)
+    """)
+    with engine.begin() as conn:
+        conn.execute(sql, {
+            "ts_utc": ts_utc,
+            "event_type": event_type,
+            "description": description,
+            "test_run_id": test_run_id,
+        })
