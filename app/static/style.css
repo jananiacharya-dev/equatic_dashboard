@@ -207,10 +207,6 @@ main {
     margin-top: 0.15rem;
 }
 
-.hidden {
-    display: none;
-}
-
 .annotation-form {
     display: flex;
     flex-direction: column;
@@ -244,4 +240,10 @@ main {
     background: var(--accent);
     color: var(--surface);
     border-color: var(--accent);
+}
+
+/* Must stay declared after .annotation-form: equal-specificity class rules
+   resolve by source order, and this needs to win whenever both are applied. */
+.hidden {
+    display: none;
 }
