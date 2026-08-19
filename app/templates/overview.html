@@ -80,9 +80,11 @@
         showlegend: false
     };
 
+    var ceX = {{ ce_x | tojson }};
+
     Plotly.newPlot("ce-chart", [
         {
-            x: {{ ce_x | tojson }},
+            x: ceX,
             y: {{ ce_y | tojson }},
             type: "scatter",
             mode: "lines+markers",
@@ -101,7 +103,13 @@
         gd.on("plotly_click", function (evt) {
             var point = evt.points[0];
             if (!point) return;
-            document.getElementById("annotation-ts-iso").value = new Date(point.x).toISOString().replace("Z", "+00:00");
+            // Plotly's date axis is timezone-naive and strips the UTC offset from
+            // point.x, so re-parsing it with `new Date()` picks up the browser's
+            // local timezone instead. Look the original UTC string back up by
+            // index instead of touching point.x.
+            var tsIso = point.curveNumber === 0 ? ceX[point.pointIndex] : annotations[point.pointIndex].ts_iso;
+            if (!tsIso) return;
+            document.getElementById("annotation-ts-iso").value = tsIso;
             document.getElementById("annotation-form").classList.remove("hidden");
         });
     });
