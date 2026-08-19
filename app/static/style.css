@@ -247,3 +247,52 @@ main {
 .hidden {
     display: none;
 }
+
+.voltage-layout {
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.c2c-picker {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem;
+    flex: 1;
+    min-width: 220px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.c2c-group > summary {
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.c2c-stack > summary {
+    color: var(--muted);
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding-left: 0.75rem;
+}
+
+.c2c-cells {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: 0.25rem;
+    padding: 0.35rem 0 0.5rem 1.25rem;
+}
+
+.c2c-cell {
+    font-size: 0.75rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+#c2c-chart {
+    flex: 3;
+    min-width: 0;
+}

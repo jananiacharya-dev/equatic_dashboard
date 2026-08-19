@@ -6,6 +6,7 @@ from app import app
 from app.data_access import (
     add_annotation,
     get_annotations,
+    get_c2c_tags,
     get_latest_metrics,
     get_metric_series,
     parse_range,
@@ -66,6 +67,30 @@ def overview():
         ce_range=[start.isoformat(), end.isoformat()],
         annotations=annotations,
         event_types=ANNOTATION_EVENT_TYPES,
+    )
+
+
+@app.route("/voltage")
+def voltage():
+    range_str = request.args.get("range", DEFAULT_RANGE)
+    offset = max(0, request.args.get("offset", 0, type=int))
+    start, end = parse_range(range_str, offset=offset)
+
+    tree = {}
+    for row in get_c2c_tags().to_dict("records"):
+        tree.setdefault(row["stack_group"], {}) \
+            .setdefault(row["stack_id"], []) \
+            .append({"cell_number": row["cell_number"], "tag_id": row["tag_id"]})
+
+    return render_template(
+        "voltage.html",
+        pages=PAGES,
+        range_presets=RANGE_PRESETS,
+        current_page="voltage",
+        current_range=range_str,
+        current_offset=offset,
+        window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
+        tree=tree,
     )
 
 

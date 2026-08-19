@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="voltage-layout">
+    <aside class="c2c-picker">
+        {% for stack_group, stacks in tree.items() %}
+        <details class="c2c-group" open>
+            <summary>{{ stack_group }}</summary>
+            {% for stack_id, cells in stacks.items() %}
+            <details class="c2c-stack">
+                <summary>{{ stack_id }}</summary>
+                <div class="c2c-cells">
+                    {% for cell in cells %}
+                    <label class="c2c-cell">
+                        <input type="checkbox" value="{{ cell.tag_id }}">
+                        C{{ "%02d" | format(cell.cell_number) }}
+                    </label>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endfor %}
+        </details>
+        {% else %}
+        <p class="empty">No C2C tags found.</p>
+        {% endfor %}
+    </aside>
+
+    <div id="c2c-chart" class="chart"></div>
+</div>
+{% endblock %}
