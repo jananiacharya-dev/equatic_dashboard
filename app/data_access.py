@@ -82,6 +82,34 @@ def get_readings(tag_ids, start, end):
         return _to_df(conn.execute(sql, {"tag_ids": list(tag_ids), "start": start, "end": end}))
 
 
+def get_c2c_tags():
+    sql = text("""
+        SELECT tag_id, stack_group, stack_id, cell_number, display_group
+        FROM sensor_inventory
+        WHERE display_page = 'voltage'
+          AND cell_number IS NOT NULL
+        ORDER BY stack_group, stack_id, cell_number
+    """)
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql))
+
+
+def get_cell_series(tag_ids, ts_start, ts_end):
+    sql = text("""
+        SELECT r.tag_id, i.stack_group, i.stack_id, i.cell_number, i.display_group,
+               r.ts_utc, r.value_avg, r.value_min, r.value_max, r.quality
+        FROM sensor_readings r
+        JOIN sensor_inventory i ON i.tag_id = r.tag_id
+        WHERE r.tag_id IN :tag_ids
+          AND r.ts_utc BETWEEN :start AND :end
+        ORDER BY r.tag_id, r.ts_utc
+    """).bindparams(bindparam("tag_ids", expanding=True))
+    with engine.connect() as conn:
+        return _to_df(conn.execute(
+            sql, {"tag_ids": list(tag_ids), "start": ts_start, "end": ts_end}
+        ))
+
+
 def get_metric_series(metric_id, start, end, resolution="daily"):
     sql = text("""
         SELECT ts_utc, value
