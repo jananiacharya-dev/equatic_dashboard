@@ -27,4 +27,55 @@
 
     <div id="c2c-chart" class="chart"></div>
 </div>
+
+<script>
+    var currentRange = {{ current_range | tojson }};
+    var currentOffset = {{ current_offset | tojson }};
+    var chartRange = {{ chart_range | tojson }};
+    var colors = ["#4da3ff", "#ff6b6b", "#6bffb8", "#ffd166", "#c792ea", "#7ee787", "#ff9f43", "#54a0ff"];
+
+    var chartLayout = {
+        xaxis: {title: "Time", type: "date", range: chartRange},
+        yaxis: {title: "Voltage (V)"},
+        margin: {t: 24},
+        legend: {orientation: "h"}
+    };
+
+    Plotly.newPlot("c2c-chart", [], chartLayout);
+
+    function redrawChart() {
+        var tagIds = Array.from(document.querySelectorAll(".c2c-cell input:checked"))
+            .map(function (el) { return el.value; });
+
+        if (tagIds.length === 0) {
+            Plotly.react("c2c-chart", [], chartLayout);
+            return;
+        }
+
+        var params = new URLSearchParams();
+        tagIds.forEach(function (id) { params.append("tag_ids", id); });
+        params.set("range", currentRange);
+        params.set("offset", currentOffset);
+
+        fetch("/voltage/series?" + params.toString())
+            .then(function (resp) { return resp.json(); })
+            .then(function (data) {
+                var traces = data.series.map(function (s, i) {
+                    return {
+                        x: s.x,
+                        y: s.y,
+                        type: "scatter",
+                        mode: "lines",
+                        name: s.stack_group + " / " + s.stack_id + " / C" + String(s.cell_number).padStart(2, "0"),
+                        line: {color: colors[i % colors.length]}
+                    };
+                });
+                Plotly.react("c2c-chart", traces, chartLayout);
+            });
+    }
+
+    document.querySelectorAll(".c2c-cell input").forEach(function (el) {
+        el.addEventListener("change", redrawChart);
+    });
+</script>
 {% endblock %}

@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 
-from flask import redirect, render_template, request, url_for
+from flask import jsonify, redirect, render_template, request, url_for
 
 from app import app
 from app.data_access import (
     add_annotation,
     get_annotations,
     get_c2c_tags,
+    get_cell_series,
     get_latest_metrics,
     get_metric_series,
     parse_range,
@@ -90,8 +91,35 @@ def voltage():
         current_range=range_str,
         current_offset=offset,
         window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
+        chart_range=[start.isoformat(), end.isoformat()],
         tree=tree,
     )
+
+
+@app.route("/voltage/series")
+def voltage_series():
+    tag_ids = request.args.getlist("tag_ids")
+    range_str = request.args.get("range", DEFAULT_RANGE)
+    offset = max(0, request.args.get("offset", 0, type=int))
+
+    if not tag_ids:
+        return jsonify(series=[])
+
+    start, end = parse_range(range_str, offset=offset)
+    df = get_cell_series(tag_ids, start, end)
+
+    series = [
+        {
+            "tag_id": tag_id,
+            "stack_group": group["stack_group"].iloc[0],
+            "stack_id": group["stack_id"].iloc[0],
+            "cell_number": int(group["cell_number"].iloc[0]),
+            "x": [ts.isoformat() for ts in group["ts_utc"]],
+            "y": group["value_avg"].tolist(),
+        }
+        for tag_id, group in df.groupby("tag_id", sort=False)
+    ]
+    return jsonify(series=series)
 
 
 @app.route("/overview/annotations", methods=["POST"])
