@@ -25,6 +25,10 @@
         {% endfor %}
     </aside>
 
+    <label class="mode-toggle">
+        <input type="checkbox" id="mode-toggle">
+        Show dV/dt (mV/hr)
+    </label>
     <div id="c2c-chart" class="chart"></div>
 </div>
 
@@ -33,6 +37,7 @@
     var currentOffset = {{ current_offset | tojson }};
     var chartRange = {{ chart_range | tojson }};
     var colors = ["#4da3ff", "#ff6b6b", "#6bffb8", "#ffd166", "#c792ea", "#7ee787", "#ff9f43", "#54a0ff"];
+    var derivativeMode = false;
 
     var chartLayout = {
         xaxis: {title: "Time", type: "date", range: chartRange},
@@ -41,14 +46,63 @@
         legend: {orientation: "h"}
     };
 
-    Plotly.newPlot("c2c-chart", [], chartLayout);
+    function buildLayout() {
+        var layout = Object.assign({}, chartLayout);
+        if (derivativeMode) {
+            layout.yaxis = {title: "dV/dt (mV/hr)"};
+            layout.shapes = [{
+                type: "line", xref: "paper", x0: 0, x1: 1,
+                yref: "y", y0: 0, y1: 0,
+                line: {color: "#888", width: 1, dash: "dot"}
+            }];
+        } else {
+            layout.yaxis = {title: "Voltage (V)"};
+            layout.shapes = [];
+        }
+        return layout;
+    }
+
+    function estimateBucketMs(x, y) {
+        var deltas = [];
+        for (var i = 0; i < x.length - 1; i++) {
+            if (y[i] === null || y[i + 1] === null) continue;
+            deltas.push(Date.parse(x[i + 1]) - Date.parse(x[i]));
+        }
+        if (deltas.length < 2) return null;
+        deltas.sort(function (a, b) { return a - b; });
+        var mid = Math.floor(deltas.length / 2);
+        return deltas.length % 2 === 0 ? (deltas[mid - 1] + deltas[mid]) / 2 : deltas[mid];
+    }
+
+    function computeDerivative(s) {
+        var bucketMs = estimateBucketMs(s.x, s.y);
+        var maxGapMs = bucketMs === null ? Infinity : bucketMs * 3;
+        var midX = [];
+        var derivY = [];
+        for (var i = 0; i < s.x.length - 1; i++) {
+            var t1 = Date.parse(s.x[i]);
+            var t2 = Date.parse(s.x[i + 1]);
+            var y1 = s.y[i];
+            var y2 = s.y[i + 1];
+            midX.push(new Date((t1 + t2) / 2).toISOString());
+            if (y1 === null || y2 === null || (t2 - t1) > maxGapMs) {
+                derivY.push(null);
+            } else {
+                var hours = (t2 - t1) / 3600000;
+                derivY.push((y2 - y1) / hours * 1000);
+            }
+        }
+        return {x: midX, y: derivY};
+    }
+
+    Plotly.newPlot("c2c-chart", [], buildLayout());
 
     function redrawChart() {
         var tagIds = Array.from(document.querySelectorAll(".c2c-cell input:checked"))
             .map(function (el) { return el.value; });
 
         if (tagIds.length === 0) {
-            Plotly.react("c2c-chart", [], chartLayout);
+            Plotly.react("c2c-chart", [], buildLayout());
             return;
         }
 
@@ -61,18 +115,24 @@
             .then(function (resp) { return resp.json(); })
             .then(function (data) {
                 var traces = data.series.map(function (s, i) {
+                    var plotted = derivativeMode ? computeDerivative(s) : {x: s.x, y: s.y};
                     return {
-                        x: s.x,
-                        y: s.y,
+                        x: plotted.x,
+                        y: plotted.y,
                         type: "scatter",
                         mode: "lines",
                         name: s.stack_group + " / " + s.stack_id + " / C" + String(s.cell_number).padStart(2, "0"),
-                        line: {color: colors[i % colors.length]}
+                        line: {color: colors[i % colors.length], width: 1}
                     };
                 });
-                Plotly.react("c2c-chart", traces, chartLayout);
+                Plotly.react("c2c-chart", traces, buildLayout());
             });
     }
+
+    document.getElementById("mode-toggle").addEventListener("change", function () {
+        derivativeMode = this.checked;
+        redrawChart();
+    });
 
     document.querySelectorAll(".c2c-cell input").forEach(function (el) {
         el.addEventListener("change", redrawChart);

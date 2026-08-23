@@ -1,10 +1,10 @@
 :root {
-    --bg: #0f1115;
-    --surface: #171a21;
-    --border: #2a2f3a;
-    --text: #e6e8ec;
-    --muted: #8b92a3;
-    --accent: #4da3ff;
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --border: #d9dce2;
+    --text: #14171c;
+    --muted: #667085;
+    --accent: #2563eb;
 }
 
 * {
@@ -295,4 +295,5 @@ main {
 #c2c-chart {
     flex: 3;
     min-width: 0;
+    height: 400px;
 }
