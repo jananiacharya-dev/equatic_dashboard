@@ -248,10 +248,32 @@ main {
     display: none;
 }
 
-.voltage-layout {
-    display: flex;
+.c2c-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    align-items: stretch;
+}
+
+.c2c-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+.c2c-panel-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.c2c-warning {
+    font-size: 0.75rem;
+    color: #b45309;
 }
 
 .c2c-picker {
@@ -259,9 +281,7 @@ main {
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.75rem;
-    flex: 1;
-    min-width: 220px;
-    max-height: 600px;
+    max-height: 220px;
     overflow-y: auto;
 }
 
@@ -292,8 +312,7 @@ main {
     gap: 0.25rem;
 }
 
-#c2c-chart {
-    flex: 3;
+.c2c-panel-chart {
     min-width: 0;
-    height: 400px;
+    min-height: 320px;
 }

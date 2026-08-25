@@ -1,35 +1,42 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="voltage-layout">
-    <aside class="c2c-picker">
-        {% for stack_group, stacks in tree.items() %}
-        <details class="c2c-group" open>
-            <summary>{{ stack_group }}</summary>
-            {% for stack_id, cells in stacks.items() %}
-            <details class="c2c-stack">
-                <summary>{{ stack_id }}</summary>
-                <div class="c2c-cells">
-                    {% for cell in cells %}
-                    <label class="c2c-cell">
-                        <input type="checkbox" value="{{ cell.tag_id }}">
-                        C{{ "%02d" | format(cell.cell_number) }}
-                    </label>
-                    {% endfor %}
-                </div>
+<div class="c2c-grid">
+    {% for i in range(4) %}
+    <div class="c2c-panel">
+        <aside class="c2c-picker" id="c2c-picker-{{ i }}">
+            {% for stack_group, stacks in tree.items() %}
+            <details class="c2c-group" open>
+                <summary>{{ stack_group }}</summary>
+                {% for stack_id, cells in stacks.items() %}
+                <details class="c2c-stack">
+                    <summary>{{ stack_id }}</summary>
+                    <div class="c2c-cells">
+                        {% for cell in cells %}
+                        <label class="c2c-cell">
+                            <input type="checkbox" value="{{ cell.tag_id }}">
+                            C{{ "%02d" | format(cell.cell_number) }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endfor %}
             </details>
+            {% else %}
+            <p class="empty">No C2C tags found.</p>
             {% endfor %}
-        </details>
-        {% else %}
-        <p class="empty">No C2C tags found.</p>
-        {% endfor %}
-    </aside>
+        </aside>
 
-    <label class="mode-toggle">
-        <input type="checkbox" id="mode-toggle">
-        Show dV/dt (mV/hr)
-    </label>
-    <div id="c2c-chart" class="chart"></div>
+        <div class="c2c-panel-controls">
+            <label class="mode-toggle">
+                <input type="checkbox" id="c2c-toggle-{{ i }}">
+                Show dV/dt (mV/hr)
+            </label>
+            <span class="c2c-warning hidden" id="c2c-warning-{{ i }}">Many traces selected — chart may be hard to read</span>
+        </div>
+        <div id="c2c-chart-{{ i }}" class="c2c-panel-chart"></div>
+    </div>
+    {% endfor %}
 </div>
 
 <script>
@@ -37,29 +44,15 @@
     var currentOffset = {{ current_offset | tojson }};
     var chartRange = {{ chart_range | tojson }};
     var colors = ["#4da3ff", "#ff6b6b", "#6bffb8", "#ffd166", "#c792ea", "#7ee787", "#ff9f43", "#54a0ff"];
-    var derivativeMode = false;
+    var TRACE_CAP = 25;
 
-    var chartLayout = {
-        xaxis: {title: "Time", type: "date", range: chartRange},
-        yaxis: {title: "Voltage (V)"},
-        margin: {t: 24},
-        legend: {orientation: "h"}
-    };
-
-    function buildLayout() {
-        var layout = Object.assign({}, chartLayout);
-        if (derivativeMode) {
-            layout.yaxis = {title: "dV/dt (mV/hr)"};
-            layout.shapes = [{
-                type: "line", xref: "paper", x0: 0, x1: 1,
-                yref: "y", y0: 0, y1: 0,
-                line: {color: "#888", width: 1, dash: "dot"}
-            }];
-        } else {
-            layout.yaxis = {title: "Voltage (V)"};
-            layout.shapes = [];
-        }
-        return layout;
+    function hexToRgb(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+    }
+    var baseColors = colors.map(hexToRgb);
+    function traceColor(i, alpha) {
+        return "rgba(" + baseColors[i % baseColors.length] + "," + alpha + ")";
     }
 
     function estimateBucketMs(x, y) {
@@ -95,47 +88,116 @@
         return {x: midX, y: derivY};
     }
 
-    Plotly.newPlot("c2c-chart", [], buildLayout());
+    function createPanel(panelEl, chartDivId) {
+        var derivativeMode = false;
+        var selectedIdx = null;
+        var toggleEl = panelEl.querySelector(".mode-toggle input");
+        var warningEl = panelEl.querySelector(".c2c-warning");
 
-    function redrawChart() {
-        var tagIds = Array.from(document.querySelectorAll(".c2c-cell input:checked"))
-            .map(function (el) { return el.value; });
+        var chartLayout = {
+            xaxis: {title: "Time", type: "date", range: chartRange},
+            yaxis: {title: "Voltage (V)"},
+            margin: {t: 24},
+            legend: {orientation: "h"}
+        };
 
-        if (tagIds.length === 0) {
-            Plotly.react("c2c-chart", [], buildLayout());
-            return;
+        function buildLayout() {
+            var layout = Object.assign({}, chartLayout);
+            if (derivativeMode) {
+                layout.yaxis = {title: "dV/dt (mV/hr)"};
+                layout.shapes = [{
+                    type: "line", xref: "paper", x0: 0, x1: 1,
+                    yref: "y", y0: 0, y1: 0,
+                    line: {color: "#888", width: 1, dash: "dot"}
+                }];
+            } else {
+                layout.yaxis = {title: "Voltage (V)"};
+                layout.shapes = [];
+            }
+            return layout;
         }
 
-        var params = new URLSearchParams();
-        tagIds.forEach(function (id) { params.append("tag_ids", id); });
-        params.set("range", currentRange);
-        params.set("offset", currentOffset);
+        function applyHighlight(idx) {
+            var gd = document.getElementById(chartDivId);
+            var n = gd.data.length;
+            var lineColors = [];
+            var lineWidths = [];
+            for (var i = 0; i < n; i++) {
+                lineColors.push(traceColor(i, idx !== null && i === idx ? 1.0 : 0.15));
+                lineWidths.push(1);
+            }
+            Plotly.restyle(chartDivId, {"line.color": lineColors, "line.width": lineWidths});
+        }
 
-        fetch("/voltage/series?" + params.toString())
-            .then(function (resp) { return resp.json(); })
-            .then(function (data) {
-                var traces = data.series.map(function (s, i) {
-                    var plotted = derivativeMode ? computeDerivative(s) : {x: s.x, y: s.y};
-                    return {
-                        x: plotted.x,
-                        y: plotted.y,
-                        type: "scatter",
-                        mode: "lines",
-                        name: s.stack_group + " / " + s.stack_id + " / C" + String(s.cell_number).padStart(2, "0"),
-                        line: {color: colors[i % colors.length], width: 1}
-                    };
+        function redrawChart() {
+            var tagIds = Array.from(panelEl.querySelectorAll(".c2c-cell input:checked"))
+                .map(function (el) { return el.value; });
+
+            warningEl.classList.toggle("hidden", tagIds.length <= TRACE_CAP);
+
+            if (tagIds.length === 0) {
+                selectedIdx = null;
+                Plotly.react(chartDivId, [], buildLayout());
+                return;
+            }
+
+            var params = new URLSearchParams();
+            tagIds.forEach(function (id) { params.append("tag_ids", id); });
+            params.set("range", currentRange);
+            params.set("offset", currentOffset);
+
+            fetch("/voltage/series?" + params.toString())
+                .then(function (resp) { return resp.json(); })
+                .then(function (data) {
+                    var traces = data.series.map(function (s, i) {
+                        var plotted = derivativeMode ? computeDerivative(s) : {x: s.x, y: s.y};
+                        return {
+                            x: plotted.x,
+                            y: plotted.y,
+                            type: "scatter",
+                            mode: "lines",
+                            name: s.stack_group + " / " + s.stack_id + " / C" + String(s.cell_number).padStart(2, "0"),
+                            line: {color: traceColor(i, 0.15), width: 1}
+                        };
+                    });
+                    Plotly.react(chartDivId, traces, buildLayout());
+                    if (selectedIdx !== null && selectedIdx >= traces.length) {
+                        selectedIdx = null;
+                    }
+                    applyHighlight(selectedIdx);
                 });
-                Plotly.react("c2c-chart", traces, buildLayout());
+        }
+
+        Plotly.newPlot(chartDivId, [], buildLayout()).then(function (gd) {
+            gd.on("plotly_click", function (evt) {
+                var point = evt.points[0];
+                if (!point) return;
+                var idx = point.curveNumber;
+                selectedIdx = (selectedIdx === idx) ? null : idx;
+                applyHighlight(selectedIdx);
             });
+            gd.on("plotly_hover", function (evt) {
+                var point = evt.points[0];
+                if (!point) return;
+                applyHighlight(point.curveNumber);
+            });
+            gd.on("plotly_unhover", function () {
+                applyHighlight(selectedIdx);
+            });
+        });
+
+        toggleEl.addEventListener("change", function () {
+            derivativeMode = this.checked;
+            redrawChart();
+        });
+
+        panelEl.querySelectorAll(".c2c-cell input").forEach(function (el) {
+            el.addEventListener("change", redrawChart);
+        });
     }
 
-    document.getElementById("mode-toggle").addEventListener("change", function () {
-        derivativeMode = this.checked;
-        redrawChart();
-    });
-
-    document.querySelectorAll(".c2c-cell input").forEach(function (el) {
-        el.addEventListener("change", redrawChart);
+    document.querySelectorAll(".c2c-panel").forEach(function (panelEl, i) {
+        createPanel(panelEl, "c2c-chart-" + i);
     });
 </script>
 {% endblock %}
