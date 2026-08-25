@@ -94,6 +94,19 @@ def get_c2c_tags():
         return _to_df(conn.execute(sql))
 
 
+def get_b2b_tags(group):
+    sql = text("""
+        SELECT tag_id, stack_group, display_group
+        FROM sensor_inventory
+        WHERE display_page = 'voltage'
+          AND stack_group = :group
+          AND cell_number IS NULL
+        ORDER BY tag_id
+    """)
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql, {"group": group}))
+
+
 def get_cell_series(tag_ids, ts_start, ts_end):
     sql = text("""
         SELECT r.tag_id, i.stack_group, i.stack_id, i.cell_number, i.display_group,

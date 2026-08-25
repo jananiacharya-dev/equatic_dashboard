@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 
+import pandas as pd
 from flask import jsonify, redirect, render_template, request, url_for
 
 from app import app
 from app.data_access import (
     add_annotation,
     get_annotations,
+    get_b2b_tags,
     get_c2c_tags,
     get_cell_series,
     get_latest_metrics,
@@ -19,6 +21,7 @@ ANNOTATION_EVENT_TYPES = ["flush", "outage", "config_change", "note"]
 PAGES = ["overview", "voltage", "process", "effluent", "carbonation"]
 RANGE_PRESETS = ["1h", "24h", "48h", "1w", "1m", "3m", "6m"]
 DEFAULT_RANGE = "24h"
+STACK_GROUPS = ["SG-1", "SG-2", "SG-3", "SG-4"]
 
 
 @app.route("/")
@@ -83,6 +86,12 @@ def voltage():
             .setdefault(row["stack_id"], []) \
             .append({"cell_number": row["cell_number"], "tag_id": row["tag_id"]})
 
+    b2b_tags = []
+    for group in STACK_GROUPS:
+        df = get_b2b_tags(group)
+        if not df.empty:
+            b2b_tags.append({"group": group, "tag_id": df.iloc[0]["tag_id"]})
+
     return render_template(
         "voltage.html",
         pages=PAGES,
@@ -93,6 +102,7 @@ def voltage():
         window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
         chart_range=[start.isoformat(), end.isoformat()],
         tree=tree,
+        b2b_tags=b2b_tags,
     )
 
 
@@ -108,17 +118,18 @@ def voltage_series():
     start, end = parse_range(range_str, offset=offset)
     df = get_cell_series(tag_ids, start, end)
 
-    series = [
-        {
+    series = []
+    for tag_id, group in df.groupby("tag_id", sort=False):
+        stack_id = group["stack_id"].iloc[0]
+        cell_number = group["cell_number"].iloc[0]
+        series.append({
             "tag_id": tag_id,
             "stack_group": group["stack_group"].iloc[0],
-            "stack_id": group["stack_id"].iloc[0],
-            "cell_number": int(group["cell_number"].iloc[0]),
+            "stack_id": None if pd.isna(stack_id) else stack_id,
+            "cell_number": None if pd.isna(cell_number) else int(cell_number),
             "x": [ts.isoformat() for ts in group["ts_utc"]],
             "y": group["value_avg"].tolist(),
-        }
-        for tag_id, group in df.groupby("tag_id", sort=False)
-    ]
+        })
     return jsonify(series=series)
 
 

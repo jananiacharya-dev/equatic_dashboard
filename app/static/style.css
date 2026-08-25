@@ -336,3 +336,26 @@ main {
     min-width: 0;
     min-height: 320px;
 }
+
+.b2b-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.b2b-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem;
+}
+
+.b2b-panel-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}

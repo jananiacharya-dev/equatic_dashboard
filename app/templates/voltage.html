@@ -42,6 +42,21 @@
     {% endfor %}
 </div>
 
+<div class="b2b-grid">
+    {% for b2b in b2b_tags %}
+    <div class="b2b-panel" data-tag-id="{{ b2b.tag_id }}" data-group="{{ b2b.group }}">
+        <h3 class="b2b-panel-title">{{ b2b.group }}</h3>
+        <div class="c2c-panel-controls">
+            <label class="mode-toggle">
+                <input type="checkbox" class="b2b-toggle">
+                Show dV/dt (mV/hr)
+            </label>
+        </div>
+        <div id="b2b-chart-{{ loop.index0 }}" class="c2c-panel-chart"></div>
+    </div>
+    {% endfor %}
+</div>
+
 <script>
     var currentRange = {{ current_range | tojson }};
     var currentOffset = {{ current_offset | tojson }};
@@ -219,6 +234,67 @@
 
     document.querySelectorAll(".c2c-panel").forEach(function (panelEl, i) {
         createPanel(panelEl, "c2c-chart-" + i);
+    });
+
+    function createB2bPanel(panelEl, chartDivId) {
+        var tagId = panelEl.dataset.tagId;
+        var groupLabel = panelEl.dataset.group;
+        var toggleEl = panelEl.querySelector(".b2b-toggle");
+        var derivativeMode = false;
+
+        function buildB2bLayout() {
+            var layout = {
+                xaxis: {title: "Time", type: "date", range: chartRange},
+                yaxis: {title: derivativeMode ? "dV/dt (mV/hr)" : "Voltage (V)"},
+                margin: {t: 24},
+                showlegend: false
+            };
+            if (derivativeMode) {
+                layout.shapes = [{
+                    type: "line", xref: "paper", x0: 0, x1: 1,
+                    yref: "y", y0: 0, y1: 0,
+                    line: {color: "#888", width: 1, dash: "dot"}
+                }];
+            }
+            return layout;
+        }
+
+        function redraw() {
+            var params = new URLSearchParams();
+            params.append("tag_ids", tagId);
+            params.set("range", currentRange);
+            params.set("offset", currentOffset);
+
+            fetch("/voltage/series?" + params.toString())
+                .then(function (resp) { return resp.json(); })
+                .then(function (data) {
+                    var s = data.series[0];
+                    if (!s) {
+                        Plotly.react(chartDivId, [], buildB2bLayout());
+                        return;
+                    }
+                    var plotted = derivativeMode ? computeDerivative(s) : {x: s.x, y: s.y};
+                    Plotly.react(chartDivId, [{
+                        x: plotted.x,
+                        y: plotted.y,
+                        type: "scatter",
+                        mode: "lines",
+                        name: groupLabel,
+                        line: {color: "#4da3ff", width: 1}
+                    }], buildB2bLayout());
+                });
+        }
+
+        toggleEl.addEventListener("change", function () {
+            derivativeMode = this.checked;
+            redraw();
+        });
+
+        redraw();
+    }
+
+    document.querySelectorAll(".b2b-panel").forEach(function (panelEl, i) {
+        createB2bPanel(panelEl, "b2b-chart-" + i);
     });
 </script>
 {% endblock %}
