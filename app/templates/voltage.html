@@ -4,28 +4,31 @@
 <div class="c2c-grid">
     {% for i in range(4) %}
     <div class="c2c-panel">
-        <aside class="c2c-picker" id="c2c-picker-{{ i }}">
-            {% for stack_group, stacks in tree.items() %}
-            <details class="c2c-group" open>
-                <summary>{{ stack_group }}</summary>
-                {% for stack_id, cells in stacks.items() %}
-                <details class="c2c-stack">
-                    <summary>{{ stack_id }}</summary>
-                    <div class="c2c-cells">
-                        {% for cell in cells %}
-                        <label class="c2c-cell">
-                            <input type="checkbox" value="{{ cell.tag_id }}">
-                            C{{ "%02d" | format(cell.cell_number) }}
-                        </label>
-                        {% endfor %}
-                    </div>
+        <div class="c2c-picker-wrap">
+            <button type="button" class="c2c-picker-toggle">▾ Cells (0)</button>
+            <aside class="c2c-picker" id="c2c-picker-{{ i }}">
+                {% for stack_group, stacks in tree.items() %}
+                <details class="c2c-group" open>
+                    <summary>{{ stack_group }}</summary>
+                    {% for stack_id, cells in stacks.items() %}
+                    <details class="c2c-stack">
+                        <summary>{{ stack_id }}</summary>
+                        <div class="c2c-cells">
+                            {% for cell in cells %}
+                            <label class="c2c-cell">
+                                <input type="checkbox" value="{{ cell.tag_id }}">
+                                C{{ "%02d" | format(cell.cell_number) }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    {% endfor %}
                 </details>
+                {% else %}
+                <p class="empty">No C2C tags found.</p>
                 {% endfor %}
-            </details>
-            {% else %}
-            <p class="empty">No C2C tags found.</p>
-            {% endfor %}
-        </aside>
+            </aside>
+        </div>
 
         <div class="c2c-panel-controls">
             <label class="mode-toggle">
@@ -91,8 +94,16 @@
     function createPanel(panelEl, chartDivId) {
         var derivativeMode = false;
         var selectedIdx = null;
+        var pickerCollapsed = false;
         var toggleEl = panelEl.querySelector(".mode-toggle input");
         var warningEl = panelEl.querySelector(".c2c-warning");
+        var pickerEl = panelEl.querySelector(".c2c-picker");
+        var pickerToggleEl = panelEl.querySelector(".c2c-picker-toggle");
+
+        function updatePickerToggleLabel() {
+            var count = panelEl.querySelectorAll(".c2c-cell input:checked").length;
+            pickerToggleEl.textContent = (pickerCollapsed ? "▸" : "▾") + " Cells (" + count + ")";
+        }
 
         var chartLayout = {
             xaxis: {title: "Time", type: "date", range: chartRange},
@@ -134,6 +145,7 @@
                 .map(function (el) { return el.value; });
 
             warningEl.classList.toggle("hidden", tagIds.length <= TRACE_CAP);
+            updatePickerToggleLabel();
 
             if (tagIds.length === 0) {
                 selectedIdx = null;
@@ -191,9 +203,18 @@
             redrawChart();
         });
 
+        pickerToggleEl.addEventListener("click", function () {
+            pickerCollapsed = !pickerCollapsed;
+            pickerEl.style.display = pickerCollapsed ? "none" : "";
+            updatePickerToggleLabel();
+            Plotly.Plots.resize(chartDivId);
+        });
+
         panelEl.querySelectorAll(".c2c-cell input").forEach(function (el) {
             el.addEventListener("change", redrawChart);
         });
+
+        updatePickerToggleLabel();
     }
 
     document.querySelectorAll(".c2c-panel").forEach(function (panelEl, i) {

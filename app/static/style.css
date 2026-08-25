@@ -276,6 +276,25 @@ main {
     color: #b45309;
 }
 
+.c2c-picker-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.c2c-picker-toggle {
+    align-self: flex-start;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
 .c2c-picker {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -313,6 +332,7 @@ main {
 }
 
 .c2c-panel-chart {
+    flex: 1;
     min-width: 0;
     min-height: 320px;
 }
