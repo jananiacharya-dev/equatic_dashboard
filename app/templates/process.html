@@ -232,16 +232,37 @@
             line: {color: traceColor(i, 1.0), width: 1}
         };
     });
+    var downWindows = {{ down_windows | tojson }};
+    var shapesByGroup = cdGroups.map(function (g, i) {
+        return (downWindows[g] || []).map(function (w) {
+            return {
+                type: "rect", xref: "x", yref: "paper",
+                x0: w[0], x1: w[1], y0: 0, y1: 1,
+                fillcolor: traceColor(i, 0.15), line: {width: 0}
+            };
+        });
+    });
+    var cdToggles = document.querySelectorAll(".cd-toggle");
+    function visibleShapes() {
+        var shapes = [];
+        cdToggles.forEach(function (cb, i) {
+            if (cb.checked) shapes = shapes.concat(shapesByGroup[i]);
+        });
+        return shapes;
+    }
+
     Plotly.newPlot("cd-chart", cdTraces, {
         xaxis: {title: "Time", type: "date", range: chartRange, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
         yaxis: {title: "A/cm² (provisional area)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
         margin: {t: 24}, legend: {orientation: "h"},
         paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff",
+        shapes: visibleShapes(),
         font: {family: "Inter Tight, sans-serif", color: "#4B4B66"}
     });
-    document.querySelectorAll(".cd-toggle").forEach(function (cb, i) {
+    cdToggles.forEach(function (cb, i) {
         cb.addEventListener("change", function () {
             Plotly.restyle("cd-chart", {visible: cb.checked ? true : "legendonly"}, [i]);
+            Plotly.relayout("cd-chart", {shapes: visibleShapes()});
         });
     });
 </script>

@@ -12,8 +12,10 @@ from app.data_access import (
     get_cell_series,
     get_current_density,
     get_latest_metrics,
+    get_latest_uptime_by_group,
     get_metric_series,
     get_process_tags,
+    get_uptime_raw,
     parse_range,
     resolution_for_range,
 )
@@ -38,6 +40,7 @@ def overview():
     start, end = parse_range(range_str, offset=offset)
 
     metrics = get_latest_metrics().to_dict("records")
+    uptime_by_group = get_latest_uptime_by_group(STACK_GROUPS).to_dict("records")
     ce_meta = next((m for m in metrics if m["metric_id"] == "ce"), None)
     ce_name = ce_meta["name"] if ce_meta else "ce"
     ce_units = ce_meta["units"] if ce_meta else ""
@@ -66,6 +69,7 @@ def overview():
         current_offset=offset,
         window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
         metrics=metrics,
+        uptime_by_group=uptime_by_group,
         ce_name=ce_name,
         ce_units=ce_units,
         ce_x=ce_x,
@@ -108,6 +112,22 @@ def voltage():
     )
 
 
+def _down_windows(df, group):
+    """Collapse a group's raw 0/100 uptime series into contiguous down-time (start, end) windows."""
+    g = df[df.stack_group == group].sort_values("ts_utc")
+    windows, win_start, prev_ts = [], None, None
+    for ts, v in zip(g["ts_utc"], g["value"]):
+        if v == 0.0:
+            win_start = win_start or ts
+        elif win_start is not None:
+            windows.append((win_start, prev_ts))
+            win_start = None
+        prev_ts = ts
+    if win_start is not None:
+        windows.append((win_start, prev_ts))
+    return windows
+
+
 def _build_role_tree(df):
     tree = {}
     for row in df.to_dict("records"):
@@ -135,6 +155,12 @@ def process():
         for group, g in ((g, cd_df[cd_df.stack_group == g]) for g in STACK_GROUPS)
     }
 
+    uptime_raw_df = get_uptime_raw(STACK_GROUPS, start, end)
+    down_windows = {
+        group: [[s.isoformat(), e.isoformat()] for s, e in _down_windows(uptime_raw_df, group)]
+        for group in STACK_GROUPS
+    }
+
     return render_template(
         "process.html",
         pages=PAGES,
@@ -148,6 +174,7 @@ def process():
         flow_tree=flow_tree,
         current_density=current_density,
         stack_groups=STACK_GROUPS,
+        down_windows=down_windows,
     )
 
 

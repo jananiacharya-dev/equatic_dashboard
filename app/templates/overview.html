@@ -4,11 +4,31 @@
 <div class="kpi-grid">
     {% for metric in metrics %}
     <div class="kpi-tile">
-        <div class="kpi-name">{{ metric.name }}</div>
+        <div class="kpi-name">
+            {{ metric.name }}
+            {% if metric.metric_id == "uptime" %}
+            <button type="button" id="uptime-toggle" class="kpi-toggle">per-group</button>
+            {% endif %}
+        </div>
+        {% if metric.metric_id == "uptime" %}
+        <div class="kpi-value" id="uptime-kpi-system">
+            {{ "%.1f" | format(metric.value) if metric.value is not none else "—" }}
+            <span class="kpi-units">{{ metric.units }}</span>
+        </div>
+        <div class="kpi-value-group hidden" id="uptime-kpi-group">
+            {% for g in uptime_by_group %}
+            <div class="kpi-group-row">
+                <span>{{ g.stack_group }}</span>
+                <span>{{ "%.1f" | format(g.value) }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
         <div class="kpi-value">
             {{ "%.1f" | format(metric.value) if metric.value is not none else "—" }}
             <span class="kpi-units">{{ metric.units }}</span>
         </div>
+        {% endif %}
     </div>
     {% else %}
     <p class="empty">No level-1 metrics in metric_registry yet.</p>
@@ -121,5 +141,15 @@
     document.getElementById("annotation-cancel").addEventListener("click", function () {
         document.getElementById("annotation-form").classList.add("hidden");
     });
+
+    var uptimeToggle = document.getElementById("uptime-toggle");
+    if (uptimeToggle) {
+        uptimeToggle.addEventListener("click", function () {
+            var showingGroup = !document.getElementById("uptime-kpi-group").classList.contains("hidden");
+            document.getElementById("uptime-kpi-system").classList.toggle("hidden", !showingGroup);
+            document.getElementById("uptime-kpi-group").classList.toggle("hidden", showingGroup);
+            uptimeToggle.textContent = showingGroup ? "per-group" : "system-wide";
+        });
+    }
 </script>
 {% endblock %}

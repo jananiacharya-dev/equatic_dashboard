@@ -165,6 +165,31 @@ def get_current_density(groups, start, end):
         return _to_df(conn.execute(sql, {"groups": list(groups), "start": start, "end": end}))
 
 
+def get_uptime_raw(groups, start, end):
+    sql = text("""
+        SELECT stack_group, ts_utc, value
+        FROM metric_values
+        WHERE metric_id = 'uptime' AND resolution = 'raw'
+          AND stack_group IN :groups
+          AND ts_utc BETWEEN :start AND :end
+        ORDER BY stack_group, ts_utc
+    """).bindparams(bindparam("groups", expanding=True))
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql, {"groups": list(groups), "start": start, "end": end}))
+
+
+def get_latest_uptime_by_group(groups):
+    sql = text("""
+        SELECT DISTINCT ON (stack_group) stack_group, ts_utc, value
+        FROM metric_values
+        WHERE metric_id = 'uptime' AND resolution = 'daily'
+          AND stack_group IN :groups
+        ORDER BY stack_group, ts_utc DESC
+    """).bindparams(bindparam("groups", expanding=True))
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql, {"groups": list(groups)}))
+
+
 def get_latest_metrics():
     sql = text("""
         SELECT DISTINCT ON (mv.metric_id)
@@ -172,6 +197,7 @@ def get_latest_metrics():
         FROM metric_values mv
         JOIN metric_registry mr ON mr.metric_id = mv.metric_id
         WHERE mr.level IN ('1', 'both')
+          AND mv.stack_group = ''
         ORDER BY mv.metric_id, mv.ts_utc DESC
     """)
     with engine.connect() as conn:

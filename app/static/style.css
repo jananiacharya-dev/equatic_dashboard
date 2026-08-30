@@ -226,7 +226,35 @@
     margin-left: 0.45rem;
     letter-spacing: -0.01em;
   }
-  
+
+  .kpi-toggle {
+    float: right;
+    font-family: var(--font-ui);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+    background: none;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+  }
+
+  .kpi-value-group {
+    margin-top: 0.5rem;
+  }
+
+  .kpi-group-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--font-ui);
+    font-size: 1.1rem;
+    color: var(--ink);
+    padding: 0.15rem 0;
+  }
+
   .empty {
     color: var(--muted);
   }

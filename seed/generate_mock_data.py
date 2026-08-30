@@ -24,6 +24,12 @@ from sqlalchemy import create_engine, text
 
 STEP_MIN = 1  # matches the plant's 1-minute sync aggregation
 ACTIVE_AREA_CM2 = 1500.0  # PROVISIONAL — placeholder, confirm real value (electrode active area per stack group, cm^2)
+UPTIME_CURRENT_THRESHOLD_A = 50.0  # PROVISIONAL — confirm real cutoff
+
+
+def is_group_up(amps):
+    """Only place the up/down definition lives — storage and the panel just consume it."""
+    return amps > UPTIME_CURRENT_THRESHOLD_A
 
 
 def _is_down(group, t_minutes, downtime):
@@ -73,16 +79,74 @@ def profile(row, t_minutes, rng, downtime=None):
     return mid + rng.normal(0, 0.05 * span)
 
 
+def current_density_and_uptime_rows(readings):
+    """readings: iterable of (stack_group, ts, amps). Returns metric_values rows for
+    current_density and uptime (raw + daily) — used both by a live generation run and
+    by the fast recompute path, so the two never drift out of sync."""
+    mv = [
+        dict(metric_id="current_density", ts_utc=ts,
+             value=round(amps / ACTIVE_AREA_CM2, 4), resolution="raw", stack_group=group)
+        for group, ts, amps in readings
+    ]
+    mv += [
+        dict(metric_id="uptime", ts_utc=ts,
+             value=100.0 if is_group_up(amps) else 0.0, resolution="raw", stack_group=group)
+        for group, ts, amps in readings
+    ]
+    daily_uptime = {}
+    for group, ts, amps in readings:
+        daily_uptime.setdefault((group, ts.replace(hour=0, minute=0)), []).append(
+            100.0 if is_group_up(amps) else 0.0)
+    mv += [
+        dict(metric_id="uptime", ts_utc=ts, value=round(float(np.mean(vs)), 1),
+             resolution="daily", stack_group=group)
+        for (group, ts), vs in daily_uptime.items()
+    ]
+    return mv
+
+
+def recompute_current_metrics(engine):
+    """Re-derive current_density/uptime for every I-type reading already in
+    sensor_readings, without regenerating sensor_readings itself. Much faster than a
+    full reseed, and also backfills uptime for older readings written before that
+    metric existed, keeping the two consistent with each other."""
+    df = pd.read_sql(text("""
+        SELECT i.stack_group, r.ts_utc, r.value_avg
+        FROM sensor_readings r
+        JOIN sensor_inventory i ON i.tag_id = r.tag_id
+        WHERE i.instrument_type = 'I'
+        ORDER BY r.ts_utc
+    """), engine)
+    print(f"{len(df)} existing I-type readings found")
+
+    mv = current_density_and_uptime_rows(list(zip(df.stack_group, df.ts_utc, df.value_avg)))
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO metric_values (metric_id, ts_utc, value, resolution, stack_group) "
+            "VALUES (:metric_id, :ts_utc, :value, :resolution, :stack_group) "
+            "ON CONFLICT (metric_id, ts_utc, resolution, stack_group) "
+            "DO UPDATE SET value = EXCLUDED.value"), mv)
+    print(f"{len(mv)} metric_values recomputed (current_density + uptime, raw + daily)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--hours", type=int, default=48)
     ap.add_argument("--batch", type=int, default=50_000)
+    ap.add_argument("--recompute-current-metrics", action="store_true",
+                     help="Skip regenerating sensor_readings; just recompute "
+                          "current_density/uptime from existing I-type readings (fast).")
     args = ap.parse_args()
 
     url = os.environ.get(
         "DATABASE_URL",
         "postgresql+psycopg2://equatic:equatic_dev@localhost:5432/plant_dashboard")
     engine = create_engine(url)
+
+    if args.recompute_current_metrics:
+        recompute_current_metrics(engine)
+        return
+
     rng = np.random.default_rng(42)
 
     inv = pd.read_sql("SELECT * FROM sensor_inventory", engine)
@@ -155,20 +219,19 @@ def main():
     days = max(args.hours // 24, 1)
     for d in range(days):
         ts = (start + timedelta(days=d)).replace(hour=0, minute=0)
-        mv += [
+        mv.append(
             dict(metric_id="gcdr_day", ts_utc=ts,
-                 value=round(rng.normal(950, 60), 1), resolution="daily", stack_group=""),
+                 value=round(rng.normal(950, 60), 1), resolution="daily", stack_group=""))
+        # PROVISIONAL — plant-wide uptime is still random mock, unrelated to the
+        # real per-group current-threshold computation below; no defined formula yet
+        # for how per-group uptime should roll up to a system-wide figure.
+        mv.append(
             dict(metric_id="uptime", ts_utc=ts,
                  value=round(float(np.clip(rng.normal(88, 6), 60, 100)), 1),
-                 resolution="daily", stack_group=""),
-        ]
+                 resolution="daily", stack_group=""))
 
-    # --- current_density, derived from the I-type readings captured above ---
-    mv += [
-        dict(metric_id="current_density", ts_utc=ts,
-             value=round(amps / ACTIVE_AREA_CM2, 4), resolution="raw", stack_group=group)
-        for group, ts, amps in current_readings
-    ]
+    # --- current_density + uptime, derived from the I-type readings captured above ---
+    mv += current_density_and_uptime_rows(current_readings)
 
     # --- ce at raw (1-min) resolution, mean-reverting drift + rare excursions,
     # rolled up into hourly/daily so short and long range pickers both have data ---
