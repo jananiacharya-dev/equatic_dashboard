@@ -59,7 +59,7 @@
             x1: a.ts_iso,
             y0: 0,
             y1: 1,
-            line: {color: "#ff6b6b", width: 1, dash: "dot"}
+            line: {color: "#F59E0B", width: 1, dash: "dot"}
         };
     });
 
@@ -93,8 +93,12 @@
         annotationHover
     ], {
         title: {{ (ce_name ~ " (" ~ ce_units ~ ")") | tojson }},
-        xaxis: {title: "Time", type: "date", range: {{ ce_range | tojson }}},
-        yaxis: {title: {{ ce_units | tojson }}},
+        colorway: ["#0E0E3C", "#5B54F0", "#C9C6FA", "#2DD4BF", "#F59E0B", "#64748B"],
+        paper_bgcolor: "#ffffff",
+        plot_bgcolor: "#ffffff",
+        font: {family: "Inter Tight, sans-serif", color: "#4B4B66"},
+        xaxis: {title: "Time", type: "date", range: {{ ce_range | tojson }}, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+        yaxis: {title: {{ ce_units | tojson }}, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
         yaxis2: {overlaying: "y", range: [0, 1], visible: false},
         shapes: annotationShapes,
         showlegend: false,

@@ -63,6 +63,12 @@ def build_inventory():
             "electrolyzer", group,
             source="windaq", page="voltage", dgroup=f"b2b_{group}")
 
+    # --- Current: 1 per stack group = 4 (provisional range pending real plant data) ---
+    for group in STACK_GROUPS:
+        add(f"I-{group}", "I", "stack_group_current", "A", 0, 5000,
+            "electrolyzer", group,
+            source="windaq", page="process", dgroup=f"current_{group}")
+
     # --- Stack process tags: 4 PT + 2 TT + 2 FM per stack ---
     pt_roles = ["anode_inlet_pressure", "anode_outlet_pressure",
                 "cathode_inlet_pressure", "cathode_outlet_pressure"]
@@ -129,7 +135,7 @@ METRICS = [
     dict(metric_id="dv_dt", name="dV_dT", formula_ref="LA acid flush analysis",
          units="mV/hr", display_page="process", level="2"),
     dict(metric_id="current_density", name="current_density",
-         formula_ref="I / active area", units="A/m2",
+         formula_ref="I / active area", units="A/cm2",
          display_page="process", level="2"),
 ]
 

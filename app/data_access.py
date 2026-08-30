@@ -107,9 +107,22 @@ def get_b2b_tags(group):
         return _to_df(conn.execute(sql, {"group": group}))
 
 
+def get_process_tags(instrument_type):
+    sql = text("""
+        SELECT tag_id, instrument_type, measurement, units,
+               stack_group, stack_id, cell_number, display_group
+        FROM sensor_inventory
+        WHERE display_page = 'process'
+          AND instrument_type = :itype
+        ORDER BY stack_group, stack_id, tag_id
+    """)
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql, {"itype": instrument_type}))
+
+
 def get_cell_series(tag_ids, ts_start, ts_end):
     sql = text("""
-        SELECT r.tag_id, i.stack_group, i.stack_id, i.cell_number, i.display_group,
+        SELECT r.tag_id, i.stack_group, i.stack_id, i.cell_number, i.measurement, i.display_group,
                r.ts_utc, r.value_avg, r.value_min, r.value_max, r.quality
         FROM sensor_readings r
         JOIN sensor_inventory i ON i.tag_id = r.tag_id
@@ -136,6 +149,20 @@ def get_metric_series(metric_id, start, end, resolution="daily"):
         return _to_df(conn.execute(
             sql, {"metric_id": metric_id, "resolution": resolution, "start": start, "end": end}
         ))
+
+
+def get_current_density(groups, start, end):
+    sql = text("""
+        SELECT stack_group, ts_utc, value
+        FROM metric_values
+        WHERE metric_id = 'current_density'
+          AND resolution = 'raw'
+          AND stack_group IN :groups
+          AND ts_utc BETWEEN :start AND :end
+        ORDER BY stack_group, ts_utc
+    """).bindparams(bindparam("groups", expanding=True))
+    with engine.connect() as conn:
+        return _to_df(conn.execute(sql, {"groups": list(groups), "start": start, "end": end}))
 
 
 def get_latest_metrics():

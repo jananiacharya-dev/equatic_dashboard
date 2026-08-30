@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="c2c-grid">
+    <section class="process-section">
+        <h2>Temperature</h2>
+        <div class="temp-panel">
+            <div class="temp-picker-wrap">
+                <button type="button" class="temp-picker-toggle">▾ Sensors (0)</button>
+                <aside class="temp-picker" id="temp-picker">
+                    {% for stack_group, stacks in temp_tree.items() %}
+                    <details class="c2c-group" open>
+                        <summary>{{ stack_group or "System" }}</summary>
+                        {% for stack_id, leaves in stacks.items() %}
+                        <details class="c2c-stack">
+                            <summary>{{ stack_id or "System" }}</summary>
+                            <div class="c2c-cells">
+                                {% for leaf in leaves %}
+                                <label class="temp-cell">
+                                    <input type="checkbox" value="{{ leaf.tag_id }}">
+                                    {{ leaf.role }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% endfor %}
+                    </details>
+                    {% else %}
+                    <p class="empty">No temperature tags found.</p>
+                    {% endfor %}
+                </aside>
+            </div>
+
+            <div class="c2c-panel-controls">
+                <span class="temp-warning hidden">Many traces selected — chart may be hard to read</span>
+            </div>
+            <div id="temp-chart" class="c2c-panel-chart"></div>
+        </div>
+    </section>
+
+    <section class="process-section">
+        <h2>Flow</h2>
+        <div class="flow-panel">
+            <div class="flow-picker-wrap">
+                <button type="button" class="flow-picker-toggle">▾ Sensors (0)</button>
+                <aside class="flow-picker" id="flow-picker">
+                    {% for stack_group, stacks in flow_tree.items() %}
+                    <details class="c2c-group" open>
+                        <summary>{{ stack_group or "System" }}</summary>
+                        {% for stack_id, leaves in stacks.items() %}
+                        <details class="c2c-stack">
+                            <summary>{{ stack_id or "System" }}</summary>
+                            <div class="c2c-cells">
+                                {% for leaf in leaves %}
+                                <label class="flow-cell">
+                                    <input type="checkbox" value="{{ leaf.tag_id }}">
+                                    {{ leaf.role }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% endfor %}
+                    </details>
+                    {% else %}
+                    <p class="empty">No flow tags found.</p>
+                    {% endfor %}
+                </aside>
+            </div>
+
+            <div class="c2c-panel-controls">
+                <span class="flow-warning hidden">Many traces selected — chart may be hard to read</span>
+            </div>
+            <div id="flow-chart" class="c2c-panel-chart"></div>
+        </div>
+    </section>
+</div>
+
+<section class="process-section">
+    <h2>Current density</h2>
+    <div class="cd-panel">
+        <div class="cd-picker">
+            {% for group in stack_groups %}
+            <label class="cd-group-toggle">
+                <input type="checkbox" class="cd-toggle" value="{{ group }}" checked>
+                {{ group }}
+            </label>
+            {% endfor %}
+        </div>
+        <div id="cd-chart" class="c2c-panel-chart"></div>
+    </div>
+</section>
+
+<section class="process-section">
+    <h2>CLER</h2>
+    <div class="process-panels"></div>
+</section>
+
+<script>
+    var currentRange = {{ current_range | tojson }};
+    var currentOffset = {{ current_offset | tojson }};
+    var chartRange = {{ chart_range | tojson }};
+    var colors = ["#0E0E3C", "#5B54F0", "#C9C6FA", "#2DD4BF", "#F59E0B", "#64748B"];
+    var TRACE_CAP = 25;
+
+    function hexToRgb(hex) {
+        var n = parseInt(hex.slice(1), 16);
+        return ((n >> 16) & 255) + "," + ((n >> 8) & 255) + "," + (n & 255);
+    }
+    var baseColors = colors.map(hexToRgb);
+    function traceColor(i, alpha) {
+        return "rgba(" + baseColors[i % baseColors.length] + "," + alpha + ")";
+    }
+
+    function createPanel(panelEl, chartDivId, prefix, rawAxisTitle) {
+        var selectedIdx = null;
+        var pickerCollapsed = false;
+        var warningEl = panelEl.querySelector("." + prefix + "-warning");
+        var pickerEl = panelEl.querySelector("." + prefix + "-picker");
+        var pickerToggleEl = panelEl.querySelector("." + prefix + "-picker-toggle");
+
+        function updatePickerToggleLabel() {
+            var count = panelEl.querySelectorAll("." + prefix + "-cell input:checked").length;
+            pickerToggleEl.textContent = (pickerCollapsed ? "▸" : "▾") + " Sensors (" + count + ")";
+        }
+
+        var chartLayout = {
+            xaxis: {title: "Time", type: "date", range: chartRange, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+            yaxis: {title: rawAxisTitle, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+            margin: {t: 24},
+            legend: {orientation: "h"},
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
+            font: {family: "Inter Tight, sans-serif", color: "#4B4B66"}
+        };
+
+        function buildLayout() {
+            return Object.assign({}, chartLayout);
+        }
+
+        function applyHighlight(idx) {
+            var gd = document.getElementById(chartDivId);
+            var n = gd.data.length;
+            var lineColors = [];
+            var lineWidths = [];
+            for (var i = 0; i < n; i++) {
+                lineColors.push(traceColor(i, idx !== null && i === idx ? 1.0 : 0.15));
+                lineWidths.push(1);
+            }
+            Plotly.restyle(chartDivId, {"line.color": lineColors, "line.width": lineWidths});
+        }
+
+        function redrawChart() {
+            var tagIds = Array.from(panelEl.querySelectorAll("." + prefix + "-cell input:checked"))
+                .map(function (el) { return el.value; });
+
+            warningEl.classList.toggle("hidden", tagIds.length <= TRACE_CAP);
+            updatePickerToggleLabel();
+
+            if (tagIds.length === 0) {
+                selectedIdx = null;
+                Plotly.react(chartDivId, [], buildLayout());
+                return;
+            }
+
+            var params = new URLSearchParams();
+            tagIds.forEach(function (id) { params.append("tag_ids", id); });
+            params.set("range", currentRange);
+            params.set("offset", currentOffset);
+
+            fetch("/voltage/series?" + params.toString())
+                .then(function (resp) { return resp.json(); })
+                .then(function (data) {
+                    var traces = data.series.map(function (s, i) {
+                        return {
+                            x: s.x,
+                            y: s.y,
+                            type: "scatter",
+                            mode: "lines",
+                            name: s.stack_group + " / " + s.stack_id + " / " + s.role,
+                            line: {color: traceColor(i, 0.15), width: 1}
+                        };
+                    });
+                    Plotly.react(chartDivId, traces, buildLayout());
+                    if (selectedIdx !== null && selectedIdx >= traces.length) {
+                        selectedIdx = null;
+                    }
+                    applyHighlight(selectedIdx);
+                });
+        }
+
+        Plotly.newPlot(chartDivId, [], buildLayout()).then(function (gd) {
+            gd.on("plotly_click", function (evt) {
+                var point = evt.points[0];
+                if (!point) return;
+                var idx = point.curveNumber;
+                selectedIdx = (selectedIdx === idx) ? null : idx;
+                applyHighlight(selectedIdx);
+            });
+            gd.on("plotly_hover", function (evt) {
+                var point = evt.points[0];
+                if (!point) return;
+                applyHighlight(point.curveNumber);
+            });
+            gd.on("plotly_unhover", function () {
+                applyHighlight(selectedIdx);
+            });
+        });
+
+        pickerToggleEl.addEventListener("click", function () {
+            pickerCollapsed = !pickerCollapsed;
+            pickerEl.style.display = pickerCollapsed ? "none" : "";
+            updatePickerToggleLabel();
+            Plotly.Plots.resize(chartDivId);
+        });
+
+        panelEl.querySelectorAll("." + prefix + "-cell input").forEach(function (el) {
+            el.addEventListener("change", redrawChart);
+        });
+
+        updatePickerToggleLabel();
+    }
+
+    createPanel(document.querySelector(".temp-panel"), "temp-chart", "temp", "Temperature (°C)");
+    createPanel(document.querySelector(".flow-panel"), "flow-chart", "flow", "Flow (L/min)");
+
+    var currentDensity = {{ current_density | tojson }};
+    var cdGroups = {{ stack_groups | tojson }};
+    var cdTraces = cdGroups.map(function (g, i) {
+        return {
+            x: currentDensity[g].x, y: currentDensity[g].y,
+            type: "scatter", mode: "lines", name: g,
+            line: {color: traceColor(i, 1.0), width: 1}
+        };
+    });
+    Plotly.newPlot("cd-chart", cdTraces, {
+        xaxis: {title: "Time", type: "date", range: chartRange, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+        yaxis: {title: "A/cm² (provisional area)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+        margin: {t: 24}, legend: {orientation: "h"},
+        paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff",
+        font: {family: "Inter Tight, sans-serif", color: "#4B4B66"}
+    });
+    document.querySelectorAll(".cd-toggle").forEach(function (cb, i) {
+        cb.addEventListener("change", function () {
+            Plotly.restyle("cd-chart", {visible: cb.checked ? true : "legendonly"}, [i]);
+        });
+    });
+</script>
+{% endblock %}

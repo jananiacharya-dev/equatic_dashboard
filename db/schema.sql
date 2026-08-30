@@ -6,7 +6,7 @@
 CREATE TABLE sensor_inventory (
     tag_id          TEXT PRIMARY KEY,
     source_tag_id   TEXT,                -- vendor's name for this tag; NULL until their list arrives
-    instrument_type TEXT NOT NULL,       -- PT, TT, FM, pHT, LS, EPC, V
+    instrument_type TEXT NOT NULL,       -- PT, TT, FM, pHT, LS, EPC, V, I
     measurement     TEXT NOT NULL,
     units           TEXT,
     range_min       DOUBLE PRECISION,
@@ -45,11 +45,12 @@ CREATE TABLE sensor_readings (
 -- WHERE tag_id IN (...) AND ts_utc BETWEEN ... is an index-only range scan.
 
 CREATE TABLE metric_values (
-    metric_id  TEXT NOT NULL REFERENCES metric_registry(metric_id),
-    ts_utc     TIMESTAMPTZ NOT NULL,
-    value      DOUBLE PRECISION,
-    resolution TEXT NOT NULL DEFAULT 'raw',   -- raw, hourly, daily
-    PRIMARY KEY (metric_id, ts_utc, resolution)
+    metric_id   TEXT NOT NULL REFERENCES metric_registry(metric_id),
+    ts_utc      TIMESTAMPTZ NOT NULL,
+    value       DOUBLE PRECISION,
+    resolution  TEXT NOT NULL DEFAULT 'raw',   -- raw, hourly, daily
+    stack_group TEXT NOT NULL DEFAULT '',      -- SG-1..SG-4 for per-group metrics; '' for plant-wide (ce, uptime, gcdr_day)
+    PRIMARY KEY (metric_id, ts_utc, resolution, stack_group)
 );
 
 CREATE TABLE state_events (

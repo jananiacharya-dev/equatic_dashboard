@@ -10,8 +10,10 @@ from app.data_access import (
     get_b2b_tags,
     get_c2c_tags,
     get_cell_series,
+    get_current_density,
     get_latest_metrics,
     get_metric_series,
+    get_process_tags,
     parse_range,
     resolution_for_range,
 )
@@ -106,6 +108,49 @@ def voltage():
     )
 
 
+def _build_role_tree(df):
+    tree = {}
+    for row in df.to_dict("records"):
+        tree.setdefault(row["stack_group"], {}) \
+            .setdefault(row["stack_id"], []) \
+            .append({"role": row["measurement"], "tag_id": row["tag_id"]})
+    return tree
+
+
+@app.route("/process")
+def process():
+    range_str = request.args.get("range", DEFAULT_RANGE)
+    offset = max(0, request.args.get("offset", 0, type=int))
+    start, end = parse_range(range_str, offset=offset)
+
+    temp_tree = _build_role_tree(get_process_tags("TT"))
+    flow_tree = _build_role_tree(get_process_tags("FM"))
+
+    cd_df = get_current_density(STACK_GROUPS, start, end)
+    current_density = {
+        group: {
+            "x": [ts.isoformat() for ts in g["ts_utc"]],
+            "y": g["value"].tolist(),
+        }
+        for group, g in ((g, cd_df[cd_df.stack_group == g]) for g in STACK_GROUPS)
+    }
+
+    return render_template(
+        "process.html",
+        pages=PAGES,
+        range_presets=RANGE_PRESETS,
+        current_page="process",
+        current_range=range_str,
+        current_offset=offset,
+        window_display=f"{start.strftime('%Y-%m-%d %H:%M')} – {end.strftime('%Y-%m-%d %H:%M')} UTC",
+        chart_range=[start.isoformat(), end.isoformat()],
+        temp_tree=temp_tree,
+        flow_tree=flow_tree,
+        current_density=current_density,
+        stack_groups=STACK_GROUPS,
+    )
+
+
 @app.route("/voltage/series")
 def voltage_series():
     tag_ids = request.args.getlist("tag_ids")
@@ -127,6 +172,7 @@ def voltage_series():
             "stack_group": group["stack_group"].iloc[0],
             "stack_id": None if pd.isna(stack_id) else stack_id,
             "cell_number": None if pd.isna(cell_number) else int(cell_number),
+            "role": group["measurement"].iloc[0],
             "x": [ts.isoformat() for ts in group["ts_utc"]],
             "y": group["value_avg"].tolist(),
         })

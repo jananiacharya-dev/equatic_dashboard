@@ -61,7 +61,7 @@
     var currentRange = {{ current_range | tojson }};
     var currentOffset = {{ current_offset | tojson }};
     var chartRange = {{ chart_range | tojson }};
-    var colors = ["#4da3ff", "#ff6b6b", "#6bffb8", "#ffd166", "#c792ea", "#7ee787", "#ff9f43", "#54a0ff"];
+    var colors = ["#0E0E3C", "#5B54F0", "#C9C6FA", "#2DD4BF", "#F59E0B", "#64748B"];
     var TRACE_CAP = 25;
 
     function hexToRgb(hex) {
@@ -121,23 +121,26 @@
         }
 
         var chartLayout = {
-            xaxis: {title: "Time", type: "date", range: chartRange},
-            yaxis: {title: "Voltage (V)"},
+            xaxis: {title: "Time", type: "date", range: chartRange, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+            yaxis: {title: "Voltage (V)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
             margin: {t: 24},
-            legend: {orientation: "h"}
+            legend: {orientation: "h"},
+            paper_bgcolor: "#ffffff",
+            plot_bgcolor: "#ffffff",
+            font: {family: "Inter Tight, sans-serif", color: "#4B4B66"}
         };
 
         function buildLayout() {
             var layout = Object.assign({}, chartLayout);
             if (derivativeMode) {
-                layout.yaxis = {title: "dV/dt (mV/hr)"};
+                layout.yaxis = {title: "dV/dt (mV/hr)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"};
                 layout.shapes = [{
                     type: "line", xref: "paper", x0: 0, x1: 1,
                     yref: "y", y0: 0, y1: 0,
-                    line: {color: "#888", width: 1, dash: "dot"}
+                    line: {color: "#C4C4D6", width: 1, dash: "dot"}
                 }];
             } else {
-                layout.yaxis = {title: "Voltage (V)"};
+                layout.yaxis = {title: "Voltage (V)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"};
                 layout.shapes = [];
             }
             return layout;
@@ -244,16 +247,19 @@
 
         function buildB2bLayout() {
             var layout = {
-                xaxis: {title: "Time", type: "date", range: chartRange},
-                yaxis: {title: derivativeMode ? "dV/dt (mV/hr)" : "Voltage (V)"},
+                xaxis: {title: "Time", type: "date", range: chartRange, gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
+                yaxis: {title: derivativeMode ? "dV/dt (mV/hr)" : "Voltage (V)", gridcolor: "#E6E6EE", linecolor: "#C4C4D6"},
                 margin: {t: 24},
-                showlegend: false
+                showlegend: false,
+                paper_bgcolor: "#ffffff",
+                plot_bgcolor: "#ffffff",
+                font: {family: "Inter Tight, sans-serif", color: "#4B4B66"}
             };
             if (derivativeMode) {
                 layout.shapes = [{
                     type: "line", xref: "paper", x0: 0, x1: 1,
                     yref: "y", y0: 0, y1: 0,
-                    line: {color: "#888", width: 1, dash: "dot"}
+                    line: {color: "#C4C4D6", width: 1, dash: "dot"}
                 }];
             }
             return layout;
@@ -280,7 +286,7 @@
                         type: "scatter",
                         mode: "lines",
                         name: groupLabel,
-                        line: {color: "#4da3ff", width: 1}
+                        line: {color: "#5B54F0", width: 1}
                     }], buildB2bLayout());
                 });
         }

@@ -23,9 +23,30 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 STEP_MIN = 1  # matches the plant's 1-minute sync aggregation
+ACTIVE_AREA_CM2 = 1500.0  # PROVISIONAL — placeholder, confirm real value (electrode active area per stack group, cm^2)
 
 
-def profile(row, t_minutes, rng):
+def _is_down(group, t_minutes, downtime):
+    """Whether the group is in one of its randomly-scheduled outage windows at this minute."""
+    if not downtime:
+        return False
+    return any(start <= t_minutes < end for start, end in downtime.get(group, []))
+
+
+def build_downtime_windows(rng, n_steps, groups):
+    """1-2 random outage windows per group (30-180 min each) over the generation period."""
+    windows = {}
+    for group in groups:
+        group_windows = []
+        for _ in range(int(rng.integers(1, 3))):
+            dur = int(rng.integers(30, 181))
+            start = int(rng.integers(0, max(n_steps - dur, 1)))
+            group_windows.append((start, start + dur))
+        windows[group] = group_windows
+    return windows
+
+
+def profile(row, t_minutes, rng, downtime=None):
     """A plausible value for this tag at this time: baseline + daily wave + noise."""
     lo, hi = row.range_min, row.range_max
     mid = (lo + hi) / 2
@@ -37,6 +58,10 @@ def profile(row, t_minutes, rng):
         drift = 0.00005 * t_minutes if row.cell_number else 0.002 * t_minutes
         noise = rng.normal(0, 0.01 if row.cell_number else 0.5)
         return base + drift + noise
+    if row.instrument_type == "I":        # stack group current: steady while operating, ~0 during downtime
+        if _is_down(row.stack_group, t_minutes, downtime):
+            return max(0.0, rng.normal(0, 5))
+        return 3200.0 + rng.normal(0, 80)
     if row.instrument_type == "PT":
         return mid + 0.05 * span * daily + rng.normal(0, 0.02 * span)
     if row.instrument_type == "TT":
@@ -70,14 +95,22 @@ def main():
     start = end - timedelta(hours=args.hours)
     n_steps = args.hours * 60 // STEP_MIN
 
+    current_groups = analog.loc[analog.instrument_type == "I", "stack_group"].unique()
+    downtime = build_downtime_windows(rng, n_steps, current_groups)
+    for group, windows in downtime.items():
+        print(f"  {group} current downtime: {windows} (minutes from start)")
+
     # --- analog -> sensor_readings, batched inserts ---
     buf = []
     total = 0
+    current_readings = []  # (stack_group, ts, amps) for I-type tags, used below to derive current_density
     with engine.begin() as conn:
         for _, row in analog.iterrows():
             for s in range(n_steps):
                 ts = start + timedelta(minutes=s * STEP_MIN)
-                v = profile(row, s * STEP_MIN, rng)
+                v = profile(row, s * STEP_MIN, rng, downtime)
+                if row.instrument_type == "I":
+                    current_readings.append((row.stack_group, ts, v))
                 jitter = abs(rng.normal(0, 0.3))
                 buf.append(dict(tag_id=row.tag_id, ts_utc=ts,
                                 value_avg=round(v, 4),
@@ -124,11 +157,18 @@ def main():
         ts = (start + timedelta(days=d)).replace(hour=0, minute=0)
         mv += [
             dict(metric_id="gcdr_day", ts_utc=ts,
-                 value=round(rng.normal(950, 60), 1), resolution="daily"),
+                 value=round(rng.normal(950, 60), 1), resolution="daily", stack_group=""),
             dict(metric_id="uptime", ts_utc=ts,
                  value=round(float(np.clip(rng.normal(88, 6), 60, 100)), 1),
-                 resolution="daily"),
+                 resolution="daily", stack_group=""),
         ]
+
+    # --- current_density, derived from the I-type readings captured above ---
+    mv += [
+        dict(metric_id="current_density", ts_utc=ts,
+             value=round(amps / ACTIVE_AREA_CM2, 4), resolution="raw", stack_group=group)
+        for group, ts, amps in current_readings
+    ]
 
     # --- ce at raw (1-min) resolution, mean-reverting drift + rare excursions,
     # rolled up into hourly/daily so short and long range pickers both have data ---
@@ -142,21 +182,22 @@ def main():
             v += rng.choice([-1, 1]) * rng.uniform(8, 16)
         raw_ce.append((ts, round(float(np.clip(v, 40, 95)), 2)))
 
-    mv += [dict(metric_id="ce", ts_utc=ts, value=v, resolution="raw") for ts, v in raw_ce]
+    mv += [dict(metric_id="ce", ts_utc=ts, value=v, resolution="raw", stack_group="") for ts, v in raw_ce]
 
     hourly_ce, daily_ce = {}, {}
     for ts, v in raw_ce:
         hourly_ce.setdefault(ts.replace(minute=0), []).append(v)
         daily_ce.setdefault(ts.replace(hour=0, minute=0), []).append(v)
-    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="hourly")
+    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="hourly", stack_group="")
            for ts, vs in hourly_ce.items()]
-    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="daily")
+    mv += [dict(metric_id="ce", ts_utc=ts, value=round(float(np.mean(vs)), 2), resolution="daily", stack_group="")
            for ts, vs in daily_ce.items()]
 
     with engine.begin() as conn:
         conn.execute(text(
-            "INSERT INTO metric_values VALUES "
-            "(:metric_id, :ts_utc, :value, :resolution) ON CONFLICT DO NOTHING"), mv)
+            "INSERT INTO metric_values (metric_id, ts_utc, value, resolution, stack_group) "
+            "VALUES (:metric_id, :ts_utc, :value, :resolution, :stack_group) "
+            "ON CONFLICT DO NOTHING"), mv)
     print(f"{len(mv)} metric_values written")
 
     # --- seed users + a few annotations ---
