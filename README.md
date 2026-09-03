@@ -67,9 +67,10 @@ app/templates/                Jinja templates (base.html tab bar + per-page cont
 app/static/style.css          minimal CSS, no framework
 ```
 
-M2 (overview page: KPI tiles, CE trend chart via Plotly, annotation feed) is
-done. `voltage` / `process` / `effluent` / `carbonation` tabs exist in the
-nav but have no routes yet — next up.
+`overview`, `voltage`, and `process` pages are live. `effluent` and
+`carbonation` tabs exist in the nav but have no routes yet — waiting on
+further info to scope those pages, so they currently 404. The CLER panel
+on the process page is an empty placeholder for the same reason.
 
 ## Current tag inventory (per Suiri's doc, Jul 2026)
 
@@ -85,6 +86,8 @@ nav but have no routes yet — next up.
 
 ## Open items
 
+- Effluent / carbonation pages and the CLER graph on the process page:
+  waiting on further info to scope before building routes
 - EPC process-variable trending: confirm with vendor, then set `display_page`
 - Vendor schema: when it arrives, populate `source_tag_id` and write the
   adapter in the data access layer (M4 timebox)
